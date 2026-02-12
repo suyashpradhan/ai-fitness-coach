@@ -4,6 +4,13 @@ const axios = require("axios");
 const crypto = require("crypto");
 const fs = require("fs");
 
+const OpenAI = require("openai");
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+
 const app = express();
 
 const TOKEN_FILE = "whoopTokens.json";
@@ -23,7 +30,7 @@ function saveTokens(tokens) {
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
   console.log("Tokens saved to file");
 }
-
+  
 // Refresh access token
 async function refreshAccessToken() {
   try {
@@ -136,7 +143,7 @@ app.get("/test-recovery", async (_, res) => {
 
   try {
     const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/recovery"
+        "https://api.prod.whoop.com/developer/v2/recovery"
     );
     res.json(data);
   } catch (err) {
@@ -150,7 +157,7 @@ app.get("/test-sleep", async (_, res) => {
 
   try {
     const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/activity/sleep"
+      "https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1"
     );
     res.json(data);
   } catch (err) {
@@ -164,7 +171,7 @@ app.get("/test-workouts", async (_, res) => {
 
   try {
     const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/activity/workout"
+      "https://api.prod.whoop.com/developer/v1/activity/workout"
     );
     res.json(data);
   } catch (err) {
@@ -178,7 +185,7 @@ app.get("/test-body", async (_, res) => {
 
   try {
     const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/user/measurement/body"
+      "https://api.prod.whoop.com/developer/v1/user/body_measurement"
     );
     res.json(data);
   } catch (err) {
@@ -186,35 +193,77 @@ app.get("/test-body", async (_, res) => {
   }
 });
 
+function buildPerformanceSummary(recovery) {
+    console.log("\n========= RECOVERY =========\n");
+    console.log(recovery);
+    console.log("\n===================================\n");
+
+    return recovery;
+}
+  
+  async function generateCoachPlan(summary) {
+    const prompt = `
+  You are an elite hybrid athlete performance coach.
+  
+  Athlete Data:
+  ${JSON.stringify(summary, null, 2)}
+  
+  Based on recovery, strain, sleep and load:
+  
+  Provide:
+  1. Tomorrow workout intensity (Low / Moderate / High)
+  2. Training recommendation
+  3. Calorie target
+  4. Protein target
+  5. Carb adjustment
+  6. Sleep target (hours)
+  7. Recovery protocol
+  
+  Keep it structured and concise.
+  `;
+  
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a data-driven performance coach." },
+        { role: "user", content: prompt }
+      ],
+    });
+  
+    return response.choices[0].message.content;
+}
+
 // Coach
 app.get("/run-coach", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
-    const cycle = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/cycles"
+    // const cycle = await whoopGet(
+    //   "https://api.prod.whoop.com/developer/v1/cycles"
+    // );
+
+    // const sleep = await whoopGet(
+    //   "https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1"
+    // );
+
+    const recovery = await whoopGet(
+      "https://api.prod.whoop.com/developer/v2/recovery"
     );
 
-    const sleep = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/activity/sleep"
-    );
+    // const body = await whoopGet(
+    //   "https://api.prod.whoop.com/developer/v1/user/body_measurement"
+    // );
 
-    const workouts = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/activity/workout"
-    );
-
-    const body = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/user/measurement/body"
-    );
+    const summary = buildPerformanceSummary(recovery);
+    const aiPlan = await generateCoachPlan(summary);
 
     res.json({
-      cycle,
-      sleep,
-      workouts,
-      body,
-    });
+        performance_summary: summary,
+        ai_plan: aiPlan
+      });
 
   } catch (err) {
+    console.error(err.response?.data || err.message);
     res.status(500).json(err.response?.data || err.message);
   }
 });
