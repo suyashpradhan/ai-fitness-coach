@@ -14,14 +14,14 @@ let oauthState = null;
 // Load tokens from file
 if (fs.existsSync(TOKEN_FILE)) {
   whoopTokens = JSON.parse(fs.readFileSync(TOKEN_FILE));
-  console.log("🔐 Tokens loaded from file");
+  console.log("Tokens loaded from file");
 }
 
 // Save tokens to file
 function saveTokens(tokens) {
   whoopTokens = tokens;
   fs.writeFileSync(TOKEN_FILE, JSON.stringify(tokens, null, 2));
-  console.log("💾 Tokens saved to file");
+  console.log("Tokens saved to file");
 }
 
 // Refresh access token
@@ -43,7 +43,7 @@ async function refreshAccessToken() {
     );
 
     saveTokens(response.data);
-    console.log("🔁 Access token refreshed");
+    console.log("Access token refreshed");
   } catch (error) {
     console.error("Refresh failed:", error.response?.data || error.message);
   }
@@ -61,7 +61,7 @@ async function whoopGet(url) {
     return response.data;
   } catch (err) {
     if (err.response?.status === 401) {
-      console.log("⚠️ Token expired. Refreshing...");
+      console.log("Token expired. Refreshing...");
       await refreshAccessToken();
 
       const retry = await axios.get(url, {
@@ -131,7 +131,7 @@ app.get("/callback", async (req, res) => {
 });
 
 // Latest cycle (includes recovery + strain)
-app.get("/test-recovery", async (req, res) => {
+app.get("/test-recovery", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
@@ -145,7 +145,7 @@ app.get("/test-recovery", async (req, res) => {
 });
 
 // Latest sleep
-app.get("/test-sleep", async (req, res) => {
+app.get("/test-sleep", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
@@ -159,7 +159,7 @@ app.get("/test-sleep", async (req, res) => {
 });
 
 // Latest workouts
-app.get("/test-workouts", async (req, res) => {
+app.get("/test-workouts", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
@@ -173,7 +173,7 @@ app.get("/test-workouts", async (req, res) => {
 });
 
 // Body measurement
-app.get("/test-body", async (req, res) => {
+app.get("/test-body", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
@@ -187,7 +187,7 @@ app.get("/test-body", async (req, res) => {
 });
 
 // Coach
-app.get("/run-coach", async (req, res) => {
+app.get("/run-coach", async (_, res) => {
   if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
 
   try {
@@ -219,9 +219,7 @@ app.get("/run-coach", async (req, res) => {
   }
 });
 
-/* =====================================================
-   START SERVER
-===================================================== */
+// Start server
 app.listen(3000, () => {
-  console.log("🚀 Server running at http://localhost:3000");
+  console.log("Server running at http://localhost:3000");
 });
