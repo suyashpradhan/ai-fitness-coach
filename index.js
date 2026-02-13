@@ -143,7 +143,7 @@ app.get("/test-recovery", async (_, res) => {
 
   try {
     const data = await whoopGet(
-        "https://api.prod.whoop.com/developer/v2/recovery"
+        "https://api.prod.whoop.com/developer/v1/cycle"
     );
     res.json(data);
   } catch (err) {
@@ -157,7 +157,7 @@ app.get("/test-sleep", async (_, res) => {
 
   try {
     const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1"
+      "https://api.prod.whoop.com/developer/v1/activity/sleep"
     );
     res.json(data);
   } catch (err) {
@@ -179,26 +179,12 @@ app.get("/test-workouts", async (_, res) => {
   }
 });
 
-// Body measurement
-app.get("/test-body", async (_, res) => {
-  if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
-
-  try {
-    const data = await whoopGet(
-      "https://api.prod.whoop.com/developer/v1/user/body_measurement"
-    );
-    res.json(data);
-  } catch (err) {
-    res.status(500).json(err.response?.data || err.message);
-  }
-});
-
-function buildPerformanceSummary(recovery) {
-    console.log("\n========= RECOVERY =========\n");
-    console.log(recovery);
-    console.log("\n===================================\n");
-
-    return recovery;
+function buildPerformanceSummary(cycle, sleep, recovery) {
+    return {
+        cycle: cycle,
+        sleep: sleep,
+        recovery: recovery,
+    };
 }
   
   async function generateCoachPlan(summary) {
@@ -235,38 +221,44 @@ function buildPerformanceSummary(recovery) {
 
 // Coach
 app.get("/run-coach", async (_, res) => {
-  if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
+    if (!whoopTokens) return res.send("Connect WHOOP first at /auth/whoop");
+  
+    try {
+      const cycle = await whoopGet(
+        "https://api.prod.whoop.com/developer/v1/cycle"
+      );
+  
+      const sleep = await whoopGet(
+        "https://api.prod.whoop.com/developer/v1/activity/sleep"
+      );
+  
+      const workouts = await whoopGet(
+        "https://api.prod.whoop.com/developer/v1/activity/workout"
+      );
 
-  try {
-    // const cycle = await whoopGet(
-    //   "https://api.prod.whoop.com/developer/v1/cycles"
-    // );
-
-    // const sleep = await whoopGet(
-    //   "https://api.prod.whoop.com/developer/v1/activity/sleep?limit=1"
-    // );
-
-    const recovery = await whoopGet(
-      "https://api.prod.whoop.com/developer/v2/recovery"
-    );
-
-    // const body = await whoopGet(
-    //   "https://api.prod.whoop.com/developer/v1/user/body_measurement"
-    // );
-
-    const summary = buildPerformanceSummary(recovery);
-    const aiPlan = await generateCoachPlan(summary);
-
-    res.json({
+      console.log(cycle);
+      console.log(sleep);
+      console.log(workouts);
+  
+      const summary = {
+        cycle: cycle.records?.[0],
+        sleep: sleep.records?.[0],
+        workouts: workouts.records
+      };
+  
+      const aiPlan = await generateCoachPlan(summary);
+  
+      res.json({
         performance_summary: summary,
         ai_plan: aiPlan
       });
-
-  } catch (err) {
-    console.error(err.response?.data || err.message);
-    res.status(500).json(err.response?.data || err.message);
-  }
-});
+  
+    } catch (err) {
+      console.error("RUN COACH ERROR:", err.response?.data || err.message);
+      res.status(500).json(err.response?.data || err.message);
+    }
+  });
+  
 
 // Start server
 app.listen(3000, () => {
